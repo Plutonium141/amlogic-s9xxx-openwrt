@@ -240,7 +240,7 @@ on:
         options:
           - ophub
           - angel
-          - yourname
+          - Plutonium141
 
 env:
   TZ: Etc/UTC
