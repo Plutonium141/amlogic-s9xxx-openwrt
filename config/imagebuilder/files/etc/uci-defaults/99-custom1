@@ -1,0 +1,14 @@
+#!/bin/sh
+
+uci -q batch << EOI
+set network.lan.ipaddr='192.168.1.2/24'
+set network.lan.gateway='192.168.1.1'
+set network.lan.dns='192.168.1.1'
+set network.lan.device='eth0'
+set dhcp.lan.ignore='1'
+EOI
+wget -O - https://hk.gh-proxy.com/https://github.com/nikkinikki-org/OpenWrt-nikki/raw/refs/heads/main/feed.sh | ash
+
+opkg install luci-i18n-nikki-zh-cn
+
+exit 0
