@@ -534,3 +534,4 @@ CONFIG_PACKAGE_vim-fuller=y
 CONFIG_PACKAGE_btop=y
 CONFIG_PACKAGE_htop=y
 CONFIG_PACKAGE_kmod-tls=y
+CONFIG_PACKAGE_openssh-sftp-server=y
