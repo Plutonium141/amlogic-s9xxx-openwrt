@@ -15,15 +15,13 @@ on:
       releases_branch:
         description: "Select the releases branch"
         required: false
-        default: "openwrt:24.10.3"
+        default: "openwrt:24.10.5"
         type: choice
         options:
-          - openwrt:24.10.3
-          - openwrt:24.10.2
-          - openwrt:24.10.1
+          - openwrt:24.10.5
+          - openwrt:24.10.4
+          - immortalwrt:24.10.4
           - immortalwrt:24.10.3
-          - immortalwrt:24.10.2
-          - immortalwrt:24.10.1
       openwrt_board:
         description: "Select device board"
         required: false
@@ -31,14 +29,17 @@ on:
         type: choice
         options:
           - all
-          - top50
-          - rest50
-          - a311d-oes_s905d_s905x3_s922x-ct2000_wxy-oect
+          - top55
+          - after55
+          - a311d-oes_s922x-oes-plus_wxy-oect
+          - nsy-g16-plus_nsy-g68-plus_bdy-g18-pro
+          - s905d_s905x3_s912_s922x-ct2000
           - a311d
           - a311d-oes
           - alark35-3500
           - anas3035
           - aio-3399b
+          - bdy-g18-pro
           - beikeyun
           - chainedbox
           - crrc
@@ -53,7 +54,7 @@ on:
           - fine3399
           - firefly-rk3399
           - fmx1-pro
-          - jp-tvbox
+          - gzpeite-p01
           - h28k
           - h66k
           - h68k
@@ -64,6 +65,7 @@ on:
           - hs530r
           - hugsun-x99
           - ipc-r
+          - jp-tvbox
           - king3399
           - kylin3399
           - lckfb-tspi
@@ -73,6 +75,8 @@ on:
           - nanopc-t6
           - nanopi-r5c
           - nanopi-r5s
+          - nsy-g16-plus
+          - nsy-g68-plus
           - orangepi-5-plus
           - orangepi-5b
           - panther-x2
@@ -81,7 +85,6 @@ on:
           - r68s
           - renegade-rk3328
           - rk3318-box
-          - rock-4d
           - rock5b
           - rock5c
           - ruisen-box
@@ -187,7 +190,7 @@ on:
           - vplus
           - wocyber-a3
           - wxy-oect
-          - wxy-oect-replaced
+          - wxy-oect-mod
           - xiaobao
           - yskj
           - zcube1-max
@@ -196,16 +199,15 @@ on:
       openwrt_kernel:
         description: "Select kernel version"
         required: false
-        default: "5.15.y_6.1.y"
+        default: "6.1.y_6.12.y"
         type: choice
         options:
-          - 5.4.y
           - 5.10.y
           - 5.15.y
           - 6.1.y
           - 6.6.y
           - 6.12.y
-          - 5.4.y_5.10.y
+          - 5.10.y_5.15.y
           - 5.15.y_6.1.y
           - 6.1.y_6.12.y
           - 6.1.y_6.6.y
@@ -230,8 +232,11 @@ on:
         options:
           - stable
           - flippy
-          - dev
           - beta
+      openwrt_ip:
+        description: "Set OpenWrt default IP address."
+        required: false
+        default: "192.168.1.1"
       builder_name:
         description: "Set OpenWrt builder signature."
         required: false
@@ -253,7 +258,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Initialization environment
         id: init
@@ -293,11 +298,12 @@ jobs:
           sudo pvcreate /dev/loop7
           sudo vgcreate github /dev/loop6 /dev/loop7
           sudo lvcreate -n runner -l 100%FREE github
-          sudo mkfs.xfs /dev/github/runner
+          sudo mkfs.xfs -f -i sparse=0 -b size=4096 /dev/github/runner
           sudo mkdir -p /builder
           sudo mount /dev/github/runner /builder
-          sudo chown -R runner.runner /builder
+          sudo chown -R runner:runner /builder
           df -Th
+          echo "status=success" >> ${GITHUB_OUTPUT}
 
       - name: Build OpenWrt Rootfs [ ${{ inputs.releases_branch }} ]
         id: imagebuilder
@@ -306,24 +312,8 @@ jobs:
           RELEASES_BRANCH="${{ inputs.releases_branch }}"
           chmod +x ${IMAGEBUILDER_SH}
           ${IMAGEBUILDER_SH} ${RELEASES_BRANCH}
-          echo "RELEASES_TAG=${RELEASES_BRANCH/:/_}" >> ${GITHUB_ENV}
-          echo "build_tag=OpenWrt_imagebuilder_${{ env.RELEASES_TAG }}_$(date +"%Y.%m")" >> ${GITHUB_OUTPUT}
-          echo "status=success" >> ${GITHUB_OUTPUT}
-
-      - name: Clear server space
-        id: clean
-        if: ${{ steps.imagebuilder.outputs.status }} == 'success' && !cancelled()
-        run: |
-          cd imagebuilder
-          [[ -d "output" ]] || mkdir output
-          cp -f bin/targets/*/*/*rootfs.tar.gz output/
-          cp -f .config output/config
-          rm -rf $(ls . | grep -v "^output$" | xargs) 2>/dev/null
-
-          # Generate sha256sum file
-          #cd output/
-          #for file in *; do [[ ! -d "${file}" ]] && sha256sum "${file}" >"${file}.sha"; done
-
+          echo "build_tag=OpenWrt_imagebuilder_${RELEASES_BRANCH/:/_}_$(date +"%Y.%m")" >> ${GITHUB_ENV}
+          # Add symbolic link
           [[ -d "/builder/openwrt" ]] || mkdir -p /builder/openwrt
           ln -sf /builder/openwrt /home/runner/work/_actions/ophub/amlogic-s9xxx-openwrt/main/openwrt
           df -hT ${PWD}
@@ -331,20 +321,22 @@ jobs:
 
       - name: Upload OpenWrt to Release
         uses: ncipollo/release-action@main
-        if: ${{ steps.clean.outputs.status }} == 'success' && !cancelled()
+        if: ${{ steps.imagebuilder.outputs.status }} == 'success' && !cancelled()
         with:
-          tag: ${{ steps.imagebuilder.outputs.build_tag }}
-          artifacts: imagebuilder/output/*
+          tag: ${{ env.build_tag }}
+          artifacts: output/*
           allowUpdates: true
           removeArtifacts: false
           replacesArtifacts: true
+          makeLatest: true
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Packaging OpenWrt
-        if: ${{ steps.clean.outputs.status }} == 'success' && !cancelled()
+        if: ${{ steps.imagebuilder.outputs.status }} == 'success' && !cancelled()
         uses: ophub/amlogic-s9xxx-openwrt@main
         with:
-          openwrt_path: imagebuilder/output/*rootfs.tar.gz
+          openwrt_path: output/*rootfs.tar.gz
+          openwrt_ip: ${{ inputs.openwrt_ip }}
           openwrt_board: ${{ inputs.openwrt_board }}
           openwrt_kernel: ${{ inputs.openwrt_kernel }}
           auto_kernel: ${{ inputs.auto_kernel }}
@@ -356,20 +348,22 @@ jobs:
         uses: ncipollo/release-action@main
         if: ${{ env.PACKAGED_STATUS }} == 'success' && !cancelled()
         with:
-          tag: ${{ steps.imagebuilder.outputs.build_tag }}
+          tag: ${{ env.build_tag }}
           artifacts: ${{ env.PACKAGED_OUTPUTPATH }}/*
           allowUpdates: true
           removeArtifacts: false
           replacesArtifacts: true
+          makeLatest: true
           token: ${{ secrets.GITHUB_TOKEN }}
           body: |
             ### OpenWrt Image information
-            - Default IP: 192.168.1.1
-            - Default username: root
-            - Default password: password
-            - Default WIFI name: OpenWrt
-            - Default WIFI password: none
+            - Default IP: `192.168.1.1`
+            - Default username: `root`
+            - Default password: `password`
+            - Default WIFI name: `OpenWrt`
+            - Default WIFI password: `none`
             ### Install to EMMC
-            - Login to OpenWrt → System → Amlogic Service → Install OpenWrt
-            ### OpenWrt Image Verification
-            - sha256sum
+            - Login to OpenWrt → `System` → `Amlogic Service` → `Install OpenWrt`
+            ### Applicable platform
+            - 🐧 `arm64`
+            - 🐋 Docker image: https://hub.docker.com/u/ophub

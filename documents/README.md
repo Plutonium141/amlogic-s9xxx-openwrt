@@ -22,6 +22,7 @@ Github Actions is a service launched by Microsoft. It provides a very well-confi
       - [Example 2, Replace an Existing Same-Named Software Package in the Current Source Code Library with a Third-Party Software Package](#example-2-replace-an-existing-same-named-software-package-in-the-current-source-code-library-with-a-third-party-software-package)
       - [Example 3, Achieve Certain Requirements by Modifying the Code in the Source Code Library](#example-3-achieve-certain-requirements-by-modifying-the-code-in-the-source-code-library)
     - [4.3 Using Image Builder to Build Firmware](#43-using-image-builder-to-build-firmware)
+    - [4.4 How to keep your configuration when switching source code branches](#44-how-to-keep-your-configuration-when-switching-source-code-branches)
   - [5. Firmware Compilation](#5-firmware-compilation)
     - [5.1 Manual Compilation](#51-manual-compilation)
     - [5.2 Scheduled Compilation](#52-scheduled-compilation)
@@ -37,6 +38,10 @@ Github Actions is a service launched by Microsoft. It provides a very well-confi
   - [8. Install OpenWrt](#8-install-openwrt)
     - [8.1 Integrating luci-app-amlogic Operation Panel at Compilation Time](#81-integrating-luci-app-amlogic-operation-panel-at-compilation-time)
     - [8.2 Install Using the Operation Panel](#82-install-using-the-operation-panel)
+    - [8.3 Install the Docker Version of OpenWrt](#83-install-the-docker-version-of-openwrt)
+      - [8.3.1 Install Docker Runtime Environment](#831-install-docker-runtime-environment)
+      - [8.3.2 Configure macvlan Network](#832-configure-macvlan-network)
+      - [8.3.3 Run the OpenWrt Docker Container](#833-run-the-openwrt-docker-container)
   - [9. Update OpenWrt system or kernel](#9-update-openwrt-system-or-kernel)
   - [10. Advanced Tutorial on Personalized Firmware Customization](#10-advanced-tutorial-on-personalized-firmware-customization)
     - [10.1 Getting to Know the Complete .config File](#101-getting-to-know-the-complete-config-file)
@@ -45,7 +50,9 @@ Github Actions is a service launched by Microsoft. It provides a very well-confi
       - [10.2.2 Changing the Model and Kernel Version Number of the Box](#1022-changing-the-model-and-kernel-version-number-of-the-box)
     - [10.3 Customizing Banner Information](#103-customizing-banner-information)
     - [10.4 Customize feeds configuration file](#104-customize-feeds-configuration-file)
-    - [10.5 Customize default software configuration information](#105-customize-default-software-configuration-information)
+    - [10.5 Customize OpenWrt default configuration files](#105-customize-openwrt-default-configuration-files)
+      - [10.5.1 First method is to add custom files during compilation](#1051-first-method-is-to-add-custom-files-during-compilation)
+      - [10.5.2 Second method is to use the openwrt\_files parameter to add custom files](#1052-second-method-is-to-use-the-openwrt_files-parameter-to-add-custom-files)
     - [10.6 Opkg package management](#106-opkg-package-management)
     - [10.7 Manage packages using the Web interface](#107-manage-packages-using-the-web-interface)
     - [10.8 How to restore the original Android TV system](#108-how-to-restore-the-original-android-tv-system)
@@ -77,7 +84,7 @@ Now you can Fork the repository. Open the repository https://github.com/ophub/am
 
 ## 4. Personalized OpenWrt Firmware Customization File Description
 
-After the first 3 steps of preparation, start personalizing the firmware customization now. The 3 files under the [config/lede-master](../config/lede-master) directory are for customizing the OpenWrt firmware. In this chapter, we only make the simplest explanation, let you experience the joy of personalized customization as soon as you start, and I put more complex customization operations in the 10th section, which requires you to have a little foundation.
+After the first 3 steps of preparation, start personalizing the firmware customization now. The 3 files under the [config/lede_master](../config/lede_master) directory are for customizing the OpenWrt firmware. In this chapter, we only make the simplest explanation, let you experience the joy of personalized customization as soon as you start, and I put more complex customization operations in the 10th section, which requires you to have a little foundation.
 
 ### 4.1 .config File Description
 
@@ -173,15 +180,48 @@ The OpenWrt official website provides a ready-made `openwrt-imagebuilder-*-armsr
 
 This repository provides a one-click manufacturing service. You just need to pass the branch parameters into the [imagebuilder script](imagebuilder/imagebuilder.sh) to complete the production.
 
-- Localized production command: In the `~/amlogic-s9xxx-openwrt` root directory, run the command `sudo ./config/imagebuilder/imagebuilder.sh openwrt:21.02.3` to generate. The parameter `21.02.3` is the current available `releases` version number for [download](https://downloads.openwrt.org/releases). The generated file is located in the `openwrt/bin/targets/armsr/armv8` directory.
+- Localized production command: In the `~/amlogic-s9xxx-openwrt` root directory, run the command `sudo ./config/imagebuilder/imagebuilder.sh openwrt:24.10.4` to generate. The parameter `24.10.4` is the current available `releases` version number for [download](https://downloads.openwrt.org/releases). The generated file is located in the `openwrt/bin/targets/armsr/armv8` directory.
 
 - Produce in `Actions` on github.com: [Build OpenWrt with Image Builder](../.github/workflows/build-openwrt-using-imagebuilder.yml)
+
+### 4.4 How to keep your configuration when switching source code branches
+
+The source code repositories for both [OpenWrt](https://github.com/openwrt/openwrt) and [ImmortalWrt](https://github.com/immortalwrt/immortalwrt) provide multiple branches to meet the needs of different users, which are mainly divided into Snapshot and Stable versions. Taking the official OpenWrt repository as an example, its `main` branch is the cutting-edge snapshot version. It contains the latest added features and software updates, primarily targeting developers and advanced users who want to experience new functionalities, but its stability has not been fully verified. On the other hand, versioned branches like `v24.10.4` are stable versions. They are based on a specific development point and have undergone comprehensive testing and bug fixing by the community. They are the officially recommended versions for the vast majority of regular users in production environments.
+
+If you have previously customized a `.config` file on the `main` branch and wish to switch to the more stable `v24.10.4` branch for compilation, directly copying the `.config` file is not feasible because the configuration options and software versions may differ between the two branches. The following method is recommended, as it can safely preserve your personalized settings and apply them to the new branch:
+
+```shell
+# 1. In the main branch, generate the configuration difference file
+# This command will extract all the modifications you have made relative to the default configuration.
+./scripts/diffconfig.sh > myconfig.diff
+
+# 2. Switch to the v24.10.4 stable branch
+git checkout v24.10.4
+git pull
+
+# 3. Update and install the feeds for the new branch
+./scripts/feeds update -a
+./scripts/feeds install -a
+
+# 4. Apply the configuration difference file to the new branch
+# This will become the basis for generating the full configuration.
+cp -f myconfig.diff .config
+
+# 5. Generate the complete .config file
+# The system will generate a complete configuration file based on your differentiated configuration and the defaults of the stable branch.
+make defconfig
+
+# 6. (Important) Check and fine-tune the configuration
+# Open the menu to check if your packages and options have been applied correctly.
+# Due to version differences, some packages in the main branch may not exist in the stable version and require manual adjustment.
+make menuconfig
+```
 
 ## 5. Firmware Compilation
 
 The configuration information of the default system is recorded in the [/etc/model_database.conf](../make-openwrt/openwrt-files/common-files/etc/model_database.conf) file, where the `BOARD` name is required to be unique.
 
-Among them, the parts of the box system that are packaged by default when the value of `BUILD` is `yes` can be used directly. Those that are not packaged by default when the value is `no` need to download the packaged system of the same `FAMILY` (recommended to download the system of kernel `5.15/5.4`), and after writing to the `USB`, the `boot partition` in the `USB` can be opened on the computer, and the `FDT dtb name` in the `/boot/uEnv.txt` file can be modified to adapt to other boxes in the list.
+Among them, the parts of the box system that are packaged by default when the value of `BUILD` is `yes` can be used directly. Those that are not packaged by default when the value is `no` need to download the packaged system of the same `FAMILY`, and after writing to the `USB`, the `boot partition` in the `USB` can be opened on the computer, and the `FDT dtb name` in the `/boot/uEnv.txt` file can be modified to adapt to other boxes in the list.
 
 When compiling locally, specify through the `-b` parameter, and when compiling in Actions on github.com, specify through the `openwrt_board` parameter. Using `-b all` means to package all devices whose `BUILD` is `yes`. When packaging with a specified `BOARD` parameter, it can be packaged regardless of whether `BUILD` is `yes` or `no`, for example: `-b r68s_s905x3-tx3_s905l3a-cm311`
 
@@ -334,6 +374,64 @@ For more instructions on the plugin, see: [https://github.com/ophub/luci-app-aml
 
 2. For the `Amlogic` and `Allwinner` platforms, use tools like [Rufus](https://rufus.ie/) or [balenaEtcher](https://www.balena.io/etcher/) to write the firmware into the USB, then insert the USB with the firmware into the box. Access the default IP of OpenWrt from the browser: 192.168.1.1 → `Log in to OpenWrt using the default account` → `System Menu` → `Amlogic Treasure Box` → `Install OpenWrt`.
 
+### 8.3 Install the Docker Version of OpenWrt
+
+You can use Docker versions of OpenWrt images on systems such as Ubuntu, Debian, and Armbian. These images are hosted on [Docker Hub](https://hub.docker.com/r/ophub) and can be downloaded directly for use.
+
+#### 8.3.1 Install Docker Runtime Environment
+
+Here, taking the Ubuntu system as an example, use the following commands to install the Docker runtime environment:
+
+```shell
+curl -fsSL https://get.docker.com | sh
+sudo usermod -aG docker $USER
+sudo newgrp docker
+```
+
+#### 8.3.2 Configure macvlan Network
+
+```shell
+# Check if existing docker networks include a macvlan network
+docker network ls
+
+# If there is no macvlan network, create one
+# Modify the subnet, gateway, and interface name according to your actual network
+docker network create -d macvlan \
+    --subnet=10.1.1.0/24 \
+    --gateway=10.1.1.1 \
+    -o parent=eth0 \
+    macvlan
+```
+
+#### 8.3.3 Run the OpenWrt Docker Container
+
+```shell
+# Run the OpenWrt container in detached mode
+docker run -d --name=openwrt \
+    --network macnet \
+    --privileged \
+    --restart always \
+    ophub/openwrt-armv8:latest
+
+# View OpenWrt container logs
+docker logs -f openwrt
+
+# Enter the OpenWrt container
+docker exec -it openwrt bash
+
+# Modify IP, gateway, DNS, etc.
+# After modification, press the ESC key, enter :wq! to save the changes.
+vi /etc/config/network
+# restart the network service
+/etc/init.d/network restart
+
+# Exit the OpenWrt container
+exit
+
+# Stop and remove the OpenWrt container
+docker rm -f openwrt
+```
+
 ## 9. Update OpenWrt system or kernel
 
 Access the OpenWrt system from the browser, in the `System` menu, choose `Amlogic Treasure Box`, choose `Upgrade OpenWrt Firmware` or `Change OpenWrt Kernel` feature to upgrade. (You can upgrade from a higher version like 5.15.50 to a lower version like 5.10.125, or you can upgrade from a lower version like 5.10.125 to a higher version like 5.15.50. The level of the kernel version number does not affect the upgrade, you can freely upgrade/downgrade).
@@ -366,7 +464,7 @@ If you have followed the tutorial to this step, I believe you already know how t
 
 Use OpenWrt's official source code repository, or other branch source code repositories, to conduct a local compilation once, such as choosing the source code repository at https://github.com/coolsnowwolf/lede. Following its compilation instructions, install the Ubuntu system locally, deploy the environment, and complete a local compilation. In the local compilation configuration interface, you can also see a lot of rich descriptions, which will strengthen your understanding of the OpenWrt compilation process.
 
-After you complete the personalized configuration of OpenWrt locally, save and exit the configuration interface. You can find the .config file in the root directory of the local OpenWrt source code repository (enter the `ls -a` command in the root directory of the code repository to view all hidden files). You can upload this file directly to your repository on github.com and replace the file at `config/lede-master/config`.
+After you complete the personalized configuration of OpenWrt locally, save and exit the configuration interface. You can find the .config file in the root directory of the local OpenWrt source code repository (enter the `ls -a` command in the root directory of the code repository to view all hidden files). You can upload this file directly to your repository on github.com and replace the file at `config/lede_master/config`.
 
 ### 10.2 Understanding Workflow Files
 
@@ -410,15 +508,15 @@ Refer to the [parameter instructions](../README.md#gitHub-actions-input-paramete
 
 ### 10.3 Customizing Banner Information
 
-The default [/etc/banner](../openwrt-files/common-files/etc/banner) information is as follows, you can use a [banner generator](https://www.bootschool.net/ascii) to customize your own personalized banner information (the style below is `slant`), just overwrite the file with the same name.
+The default [/etc/banner](../openwrt-files/common-files/etc/banner) information is as follows, you can use a [banner generator](https://www.bootschool.net/ascii) to customize your own personalized banner information (the style below is `slant`). Use the method described in `10.5.2` to add a custom banner and other OpenWrt files when building OpenWrt.
 
 ```shell
-      ____                 _       __     __        ____
-     / __ \____  ___  ____| |     / /____/ /_      / __ )____  _  __
-    / / / / __ \/ _ \/ __ \ | /| / / ___/ __/_____/ __  / __ \| |/_/
-   / /_/ / /_/ /  __/ / / / |/ |/ / /  / /_/_____/ /_/ / /_/ />  <
-   \____/ .___/\___/_/ /_/|__/|__/_/   \__/     /_____/\____/_/|_|
-       /_/  H E L L O - W O R L D    W I R E L E S S - F R E E D O M
+     ____                 _       __     __        __    ___    ____
+    / __ \____  ___  ____| |     / /____/ /_      / /   /   |  / __ )
+   / / / / __ \/ _ \/ __ \ | /| / / ___/ __/     / /   / /| | / __  |
+  / /_/ / /_/ /  __/ / / / |/ |/ / /  / /_      / /___/ ___ |/ /_/ /
+  \____/ .___/\___/_/ /_/|__/|__/_/   \__/     /_____/_/  |_/_____/
+      /_/ H E L L O - W O R L D   @   W I R E L E S S - F R E E D O M
 ───────────────────────────────────────────────────────────────────────
 ```
 
@@ -426,7 +524,9 @@ The default [/etc/banner](../openwrt-files/common-files/etc/banner) information 
 
 When you look at the feeds.conf.default file in the source code repository, have you noticed that it introduces many package source code repositories? Yes, we can find the source code repository provided by the official openwrt on GitHub, and many people share the branches and packages of openwrt. If you are familiar with them, you can add from here. For example, the [feeds.conf.default](https://github.com/coolsnowwolf/lede/blob/master/feeds.conf.default) in the coolsnowwolf source code repository.
 
-### 10.5 Customize default software configuration information
+### 10.5 Customize OpenWrt default configuration files
+
+#### 10.5.1 First method is to add custom files during compilation
 
 When we are using openwrt, we have configured many pieces of software. Most of the configuration information of these software is saved in the /etc/config/ and other related directories of your openwrt. Copy these configuration information storage files to the files folder in the root directory of the repository on GitHub. Please keep the directory structure and file names the same. During the openwrt compilation, these configuration information storage files will be compiled into your firmware. The specific method is in the .github/workflows/build-openwrt-system-image.yml file. Let's take a look at this piece of code together:
 
@@ -441,6 +541,19 @@ When we are using openwrt, we have configured many pieces of software. Most of t
 ```
 
 Please do not copy those configuration information files that involve privacy. If your repository is public, the files you put in the files directory are also public. Do not expose secrets. Some password information can be encrypted using private key settings and other methods that you just learned in the GitHub Actions Quick Start Guide. You must understand what you are doing.
+
+#### 10.5.2 Second method is to use the openwrt_files parameter to add custom files
+
+Using ophub to package OpenWrt, the `openwrt_files` parameter can be used to add or override custom files to ophub's [common-files](https://github.com/ophub/amlogic-s9xxx-openwrt/tree/main/make-openwrt/openwrt-files/common-files) directory. The directory structure must be consistent with the OpenWrt root directory to ensure that the files are correctly overwritten in the firmware (for example, default configuration files should be placed in the `etc/config/` subdirectory). An example of the setting method:
+
+```yaml
+- name: Packaging OpenWrt
+  uses: ophub/amlogic-s9xxx-openwrt@main
+  with:
+    openwrt_path: openwrt/output/*rootfs.tar.gz
+    openwrt_files: files
+    ...
+```
 
 ### 10.6 Opkg package management
 
@@ -604,7 +717,7 @@ Network -> File Transfer -> curl、wget-ssl
         -> Version Control Systems -> git
         -> WirelessAPD   -> hostapd-common
                          -> wpa-cli
-                         -> wpad-basic
+                         -> wpad-mesh-openssl
         -> iw
 
 

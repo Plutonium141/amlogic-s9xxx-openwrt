@@ -22,6 +22,7 @@ Github Actions 是 Microsoft 推出的一项服务，它提供了性能配置非
       - [举例2，用第三方软件包替换当前源码库中的已有的同名软件包](#举例2用第三方软件包替换当前源码库中的已有的同名软件包)
       - [举例3，通过修改源码库中的代码来实现某些需求](#举例3通过修改源码库中的代码来实现某些需求)
     - [4.3 使用 Image Builder 制作固件](#43-使用-image-builder-制作固件)
+    - [4.4 如何保留配置切换源码分支](#44-如何保留配置切换源码分支)
   - [5. 编译固件](#5-编译固件)
     - [5.1 手动编译](#51-手动编译)
     - [5.2 定时编译](#52-定时编译)
@@ -37,6 +38,10 @@ Github Actions 是 Microsoft 推出的一项服务，它提供了性能配置非
   - [8. 安装 OpenWrt](#8-安装-openwrt)
     - [8.1 在编译时集成 luci-app-amlogic 操作面板](#81-在编译时集成-luci-app-amlogic-操作面板)
     - [8.2 使用操作面板安装](#82-使用操作面板安装)
+    - [8.3 安装 Docker 版本的 OpenWrt](#83-安装-docker-版本的-openwrt)
+      - [8.3.1 安装 Docker 运行环境](#831-安装-docker-运行环境)
+      - [8.3.2 设置 macvlan 网络](#832-设置-macvlan-网络)
+      - [8.3.3 运行 OpenWrt Docker 容器](#833-运行-openwrt-docker-容器)
   - [9. 升级 OpenWrt 系统或内核](#9-升级-openwrt-系统或内核)
   - [10. 个性化固件定制晋级教程](#10-个性化固件定制晋级教程)
     - [10.1 认识完整的 .config 文件](#101-认识完整的-config-文件)
@@ -45,7 +50,9 @@ Github Actions 是 Microsoft 推出的一项服务，它提供了性能配置非
       - [10.2.2 更改盒子的型号和内核版本号](#1022-更改盒子的型号和内核版本号)
     - [10.3 自定义 banner 信息](#103-自定义-banner-信息)
     - [10.4 自定义 feeds 配置文件](#104-自定义-feeds-配置文件)
-    - [10.5 自定义软件默认配置信息](#105-自定义软件默认配置信息)
+    - [10.5 自定义 OpenWrt 默认配置文件](#105-自定义-openwrt-默认配置文件)
+      - [10.5.1 第一种方法是在编译时添加自定义文件](#1051-第一种方法是在编译时添加自定义文件)
+      - [10.5.2 第二种方法是在打包时添加自定义文件](#1052-第二种方法是在打包时添加自定义文件)
     - [10.6 Opkg 软件包管理](#106-opkg-软件包管理)
     - [10.7 使用 Web 界面管理软件包](#107-使用-web-界面管理软件包)
     - [10.8 如何恢复原安卓 TV 系统](#108-如何恢复原安卓-tv-系统)
@@ -77,7 +84,7 @@ Github Actions 是 Microsoft 推出的一项服务，它提供了性能配置非
 
 ## 4. 个性化 OpenWrt 固件定制文件说明
 
-经过前面 3 步准备工作，现在开始进行个性化固件定制吧。在 [config/lede-master](../config/lede-master) 目录下的 3 个是进行 OpenWrt 固件个性化定制的文件。这个章节我们只做最简单的说明，让你一动手就能体验到个性化定制的快乐，比较复杂的定制化操作我放在了第 10 节里，这需要你有一点点基础。
+经过前面 3 步准备工作，现在开始进行个性化固件定制吧。在 [config/lede_master](../config/lede_master) 目录下的 3 个是进行 OpenWrt 固件个性化定制的文件。这个章节我们只做最简单的说明，让你一动手就能体验到个性化定制的快乐，比较复杂的定制化操作我放在了第 10 节里，这需要你有一点点基础。
 
 ### 4.1 .config 文件说明
 
@@ -171,15 +178,48 @@ OpenWrt 官方网站提供了制作好的 `openwrt-imagebuilder-*-armsr-armv8.Li
 
 本仓库提供了一键制作服务，你只需要把分支参数传入 [imagebuilder 脚本](imagebuilder/imagebuilder.sh) 即可完成制作。
 
-- 本地化制作命令：可以在 `~/amlogic-s9xxx-openwrt` 根目录下运行 `sudo ./config/imagebuilder/imagebuilder.sh openwrt:21.02.3` 指令即可生成。其中的参数 `21.02.3` 是当前可以[下载](https://downloads.openwrt.org/releases)使用的 `releases` 版本号。生成的文件在 `openwrt/bin/targets/armsr/armv8` 目录下。
+- 本地化制作命令：可以在 `~/amlogic-s9xxx-openwrt` 根目录下运行 `sudo ./config/imagebuilder/imagebuilder.sh openwrt:24.10.4` 指令即可生成。其中的参数 `24.10.4` 是当前可以[下载](https://downloads.openwrt.org/releases)使用的 `releases` 版本号。生成的文件在 `openwrt/bin/targets/armsr/armv8` 目录下。
 
 - 使用 github.com 的 `Actions` 中进行制作：[Build OpenWrt with Image Builder](../.github/workflows/build-openwrt-using-imagebuilder.yml)
+
+### 4.4 如何保留配置切换源码分支
+
+[OpenWrt](https://github.com/openwrt/openwrt) 与 [ImmortalWrt](https://github.com/immortalwrt/immortalwrt) 的源码仓库均提供了多个分支，以满足不同用户的需求，主要分为快照版（Snapshot）和稳定版（Stable）。以 OpenWrt 官方仓库为例，其中的 `main` 分支是开发前沿的快照版，它包含了最新添加的功能和软件更新，主要面向开发者和希望体验新特性的高级用户，但其稳定性未经充分验证。而 `v24.10.4` 等版本号分支是稳定版，它们基于某个特定的开发节点，经过了社区的全面测试和错误修复，是官方推荐给绝大多数普通用户在生产环境中使用的版本。
+
+如果您之前在 `main` 分支上已经定制了一份 `.config` 配置文件，并且希望切换到更稳定的 `v24.10.4` 分支进行编译，直接复制 `.config` 文件是不可行的，因为两个分支的配置选项和软件版本可能存在差异。推荐使用以下方法，它能安全地保留您的个性化设置并将其应用到新分支：
+
+```shell
+# 1. 在 main 分支下，生成配置差异文件
+# 这个命令会提取出您相对于默认配置所做的所有修改。
+./scripts/diffconfig.sh > myconfig.diff
+
+# 2. 切换到 v24.10.4 稳定版分支
+git checkout v24.10.4
+git pull
+
+# 3. 更新并安装新分支的 feeds
+./scripts/feeds update -a
+./scripts/feeds install -a
+
+# 4. 将配置差异文件应用到新分支
+# 这会成为生成完整配置的基础
+cp -f myconfig.diff .config
+
+# 5. 生成完整的 .config 文件
+# 系统会基于您的差异化配置，并结合稳定版分支的默认值，生成一份完整的配置文件。
+make defconfig
+
+# 6. （重要）核对并微调配置
+# 打开菜单，检查您的软件包和选项是否都已正确应用。
+# 由于版本差异，某些在 main 分支中的软件包在稳定版中可能不存在，需要您手动调整。
+make menuconfig
+```
 
 ## 5. 编译固件
 
 默认系统的配置信息记录在 [/etc/model_database.conf](../make-openwrt/openwrt-files/common-files/etc/model_database.conf) 文件里，其中的 `BOARD` 名字要求唯一。
 
-其中 `BUILD` 的值是 `yes` 的是默认打包的部分盒子的系统，这些盒子可以直接使用。默认值是 `no` 的没有打包，这些没有打包的盒子使用时需要下载相同 `FAMILY` 的打包好的系统（推荐下载 `5.15/5.4` 内核的系统），在写入 `USB` 后，可以在电脑上打开 `USB 中的 boot 分区`，修改 `/boot/uEnv.txt` 文件中 `FDT 的 dtb 名称`，适配列表中的其他盒子。
+其中 `BUILD` 的值是 `yes` 的是默认打包的部分盒子的系统，这些盒子可以直接使用。默认值是 `no` 的没有打包，这些没有打包的盒子使用时需要下载相同 `FAMILY` 的打包好的系统，在写入 `USB` 后，可以在电脑上打开 `USB 中的 boot 分区`，修改 `/boot/uEnv.txt` 文件中 `FDT 的 dtb 名称`，适配列表中的其他盒子。
 
 在本地编译时通过 `-b` 参数指定，在 github.com 的 Actions 里编译时通过 `openwrt_board` 参数指定。使用 `-b all` 代表打包 `BUILD` 是 `yes` 的全部设备。使用指定 `BOARD` 参数打包时，无论 `BUILD` 是 `yes` 或者 `no` 均可打包，例如：`-b r68s_s905x3-tx3_s905l3a-cm311`
 
@@ -330,6 +370,64 @@ git clone https://github.com/ophub/luci-app-amlogic.git package/luci-app-amlogic
 
 2. `Amlogic` 和 `Allwinner` 平台，使用 [Rufus](https://rufus.ie/) 或者 [balenaEtcher](https://www.balena.io/etcher/) 等工具将固件写入 USB 里，然后把写好固件的 USB 插入盒子。从浏览器访问 OpenWrt 的默认 IP: 192.168.1.1 → `使用默认账户登录进入 OpenWrt` → `系统菜单` → `晶晨宝盒` → `安装 OpenWrt` 。
 
+### 8.3 安装 Docker 版本的 OpenWrt
+
+可以在 Ubuntu/Debian/Armbian 等系统中使用 Docker 版本的 OpenWrt 镜像。这些镜像托管在 [Docker Hub](https://hub.docker.com/r/ophub) 上，可以直接下载使用。
+
+#### 8.3.1 安装 Docker 运行环境
+
+这里以 Ubuntu 系统为例，使用下面的命令安装 Docker 运行环境：
+
+```shell
+curl -fsSL https://get.docker.com | sh
+sudo usermod -aG docker $USER
+sudo newgrp docker
+```
+
+#### 8.3.2 设置 macvlan 网络
+
+```shell
+# 查看已有的 docker 网络是否包含 macvlan 网络
+docker network ls
+
+# 如果没有 macvlan 网络，则创建 macvlan 网络
+# 其中的网段、网关和网卡名称根据自己的实际网络修改
+docker network create -d macvlan \
+    --subnet=10.1.1.0/24 \
+    --gateway=10.1.1.1 \
+    -o parent=eth0 \
+    macvlan
+```
+
+#### 8.3.3 运行 OpenWrt Docker 容器
+
+```shell
+# 以后台方式运行 OpenWrt 容器
+docker run -d --name=openwrt \
+    --network macnet \
+    --privileged \
+    --restart always \
+    ophub/openwrt-armv8:latest
+
+# 查看 OpenWrt 容器日志
+docker logs -f openwrt
+
+# 进入 OpenWrt 容器
+docker exec -it openwrt bash
+
+# 修改 IP、网关、DNS等
+# 修改完成后按 ESC 键，并输入 :wq! 保存修改结果
+vi /etc/config/network
+# 重启网络服务
+/etc/init.d/network restart
+
+# 退出 OpenWrt 容器
+exit
+
+# 停止并删除 OpenWrt 容器
+docker rm -f openwrt
+```
+
 ## 9. 升级 OpenWrt 系统或内核
 
 从浏览器访问 openwrt 系统，在 `系统` 菜单下，选择 `晶晨宝盒`，选择 `升级 OpenWrt 固件` 或 `更换 OpenWrt 内核` 功能进行升级。（你可以从高版本如 5.15.50 升级到低版本如 5.10.125 ，也可以从低版本如 5.10.125 升级到高版本如 5.15.50 。内核版本号的高低不影响升级，可自由升级/降级）。
@@ -361,7 +459,7 @@ openwer-kernel -s
 
 使用 openwrt 的官方源码库，或者其他分支的源码库进行一次本地化编译，如选择 https://github.com/coolsnowwolf/lede 的源码库，根据它的编译说明，在本地安装 Ubuntu 系统，部署环境并完成一次本地编译。在本地编译配置界面中，你也可以看到很多丰富的说明，这将加强你对 openwrt 编译过程的理解。
 
-当你在本地完成 openwrt 个性化配置后，保存并退出配置界面，你可以在本地 openwrt 源码库的根目录下找到 .config 文件（ 在代码库的根目录下输入 `ls -a` 命令查看全部隐藏文件），你可以把这个文件直接上传到 github.com 里你的仓库里，替换 `config/lede-master/config` 这个文件。
+当你在本地完成 openwrt 个性化配置后，保存并退出配置界面，你可以在本地 openwrt 源码库的根目录下找到 .config 文件（ 在代码库的根目录下输入 `ls -a` 命令查看全部隐藏文件），你可以把这个文件直接上传到 github.com 里你的仓库里，替换 `config/lede_master/config` 这个文件。
 
 ### 10.2 认识 workflow 文件
 
@@ -405,15 +503,15 @@ REPO_BRANCH: openwrt-21.02
 
 ### 10.3 自定义 banner 信息
 
-默认的 [/etc/banner](../openwrt-files/common-files/etc/banner) 信息如下，你可以使用 [banner 生成器](https://www.bootschool.net/ascii) 定制专属自己的个性化 banner 信息（下面的样式为 `slant`），覆盖同名文件即可。
+默认的 [/etc/banner](../openwrt-files/common-files/etc/banner) 信息如下，你可以使用 [banner 生成器](https://www.bootschool.net/ascii) 定制专属自己的个性化 banner 信息（下面的样式为 `slant`）。使用 `10.5.2` 的方法可以在制作 OpenWrt 时添加自定义 banner 以及其他 OpenWrt 文件。
 
 ```shell
-      ____                 _       __     __        ____
-     / __ \____  ___  ____| |     / /____/ /_      / __ )____  _  __
-    / / / / __ \/ _ \/ __ \ | /| / / ___/ __/_____/ __  / __ \| |/_/
-   / /_/ / /_/ /  __/ / / / |/ |/ / /  / /_/_____/ /_/ / /_/ />  <
-   \____/ .___/\___/_/ /_/|__/|__/_/   \__/     /_____/\____/_/|_|
-       /_/  H E L L O - W O R L D    W I R E L E S S - F R E E D O M
+     ____                 _       __     __        __    ___    ____
+    / __ \____  ___  ____| |     / /____/ /_      / /   /   |  / __ )
+   / / / / __ \/ _ \/ __ \ | /| / / ___/ __/     / /   / /| | / __  |
+  / /_/ / /_/ /  __/ / / / |/ |/ / /  / /_      / /___/ ___ |/ /_/ /
+  \____/ .___/\___/_/ /_/|__/|__/_/   \__/     /_____/_/  |_/_____/
+      /_/ H E L L O - W O R L D   @   W I R E L E S S - F R E E D O M
 ───────────────────────────────────────────────────────────────────────
 ```
 
@@ -421,7 +519,9 @@ REPO_BRANCH: openwrt-21.02
 
 当你查看源码库中的 feeds.conf.default 文件时，你是不是发现这里引入了很多软件包的源码库呢，没错，我们在 GitHub 上可以找到 openwrt 官方提供的源码库，还有很多人分享的 openwrt 的分支及软件包，如果你了解他们，可以从这里添加。比如 coolsnowwolf 源码库中的 [feeds.conf.default](https://github.com/coolsnowwolf/lede/blob/master/feeds.conf.default)
 
-### 10.5 自定义软件默认配置信息
+### 10.5 自定义 OpenWrt 默认配置文件
+
+#### 10.5.1 第一种方法是在编译时添加自定义文件
 
 我们在使用的 openwrt 的时候，已经对很多软件进行了配置，这些软件的配置信息大部分都保存在了你的 openwrt 的 /etc/config/ 等相关目录下，把这些配置信息的存储文件复制到 GitHub 中仓库根目录下的 files 文件夹中，请保持目录结构和文件名称相同。在 openwrt 编译时，这些配置信息的存储文件将会被编译到你的固件中，具体做法在 .github/workflows/build-openwrt-system-image.yml 文件中，让我们在一起看看这段代码吧：
 
@@ -436,6 +536,19 @@ REPO_BRANCH: openwrt-21.02
 ```
 
 请不要复制那些涉及隐私的配置信息文件，如果你的仓库是公开的，那么你放在 files 目录里的文件也是公开的，千万不要把秘密公开。一些密码等信息，可以使用你刚才在 GitHub Actions 快速上手指南里学习到的私钥设置等方法来加密使用。你一定要了解你在做什么。
+
+#### 10.5.2 第二种方法是在打包时添加自定义文件
+
+使用 ophub 打包 OpenWrt 时，使用 `openwrt_files` 参数可以添加或覆盖自定义文件到 ophub 的 [common-files](https://github.com/ophub/amlogic-s9xxx-openwrt/tree/main/make-openwrt/openwrt-files/common-files) 目录。目录结构必须与 OpenWrt 根目录保持一致，以确保文件被正确覆盖到固件中（例如：默认配置文件应存放于 `etc/config/` 子目录下）。设置方法举例：
+
+```yaml
+- name: Packaging OpenWrt
+  uses: ophub/amlogic-s9xxx-openwrt@main
+  with:
+    openwrt_path: openwrt/output/*rootfs.tar.gz
+    openwrt_files: files
+    ...
+```
 
 ### 10.6 Opkg 软件包管理
 
@@ -599,7 +712,7 @@ Network -> File Transfer -> curl、wget-ssl
         -> Version Control Systems -> git
         -> WirelessAPD   -> hostapd-common
                          -> wpa-cli
-                         -> wpad-basic
+                         -> wpad-mesh-openssl
         -> iw
 
 

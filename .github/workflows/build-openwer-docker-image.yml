@@ -14,12 +14,12 @@ on:
       source_branch:
         description: "Select the source branch"
         required: false
-        default: "official"
+        default: "openwrt_main"
         type: choice
         options:
-          - official
-          - lede
-          - immortalwrt
+          - openwrt_main
+          - immortalwrt_master
+          - lede_master
       docker_img:
         description: "Set the docker image"
         required: false
@@ -41,7 +41,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Download OpenWrt rootfs file [ ${{ inputs.source_branch }} ]
         id: down
@@ -50,7 +50,7 @@ jobs:
           # Get OpenWrt file
           openwrt_url="$(curl \
                             --header "authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-                            -s "https://api.github.com/repos/${GITHUB_REPOSITORY}/releases?per_page=100" |
+                            -s "https://api.github.com/repos/${{ github.repository }}/releases?per_page=20" |
                             grep -o "OpenWrt_.*${{ inputs.source_branch }}.*/.*rootfs.tar.gz" |
                             sort -urV |
                             head -n 1
@@ -58,7 +58,7 @@ jobs:
           [[ -z "${openwrt_url}" ]] && echo -e "OpenWrt file not found!" && exit 1
 
           [[ -d "openwrt" ]] || mkdir -p openwrt
-          curl -fsSL "https://github.com/${GITHUB_REPOSITORY}/releases/download/${openwrt_url}" -o "openwrt/openwrt-armsr-armv8-generic-rootfs.tar.gz"
+          curl -fsSL "https://github.com/${{ github.repository }}/releases/download/${openwrt_url}" -o "openwrt/openwrt-armsr-armv8-generic-rootfs.tar.gz"
           [[ "${?}" -ne "0" ]] && echo "OpenWrt file download failed." && exit 1
           echo "status=success" >> ${GITHUB_OUTPUT}
 
